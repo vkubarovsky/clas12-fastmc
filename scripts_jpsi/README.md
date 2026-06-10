@@ -1,192 +1,138 @@
-# Fast MC scripts — ifarm2402
+# J/ψ Fast MC scripts — ifarm2402
 
-CLAS12 fast detector simulation for ep → e'p'φ, φ → K⁺K⁻.
+CLAS12 fast detector simulation for **ep → e'p'J/ψ, J/ψ → e⁺e⁻**.
 Per-particle MLP acceptance + MDN resolution, trained on GEMC TruthMatch data.
+
+Derived from the φ chain (`../scripts_phi/`, v11) — version numbering restarts
+at **v1** for J/ψ; the two chains evolve independently.
+
+## J/ψ-specific conventions
+
+- **Scattered electron in the Forward Tagger.** Matched to a reconstructed
+  pid==11 track with |REC::Particle.status| in 1000–1999, nearest in |p|,
+  no kinematic window (`--electron_match pidonly_ft`).
+  Generated θ(e′) < 7°, no minimum (FT acceptance ≈ 2.5–4.5°).
+- **Everything else FD-only, no CD.** Decay e⁺/e⁻: pid==±11 in the FD,
+  nearest in |p|. Proton: hit-based TruthMatch (MC::RecMatch quality > 0.98);
+  a match outside the FD counts as *not detected*.
+- **Two e⁻ per event**, separated by detector:
+
+  | index | particle | detector | model file | cuts-JSON key |
+  |---|---|---|---|---|
+  | 0 | e′ scattered | FT | `e-.pt`  | `e-`/`FT` |
+  | 1 | p            | FD | `p.pt`   | `p`/`FD`  |
+  | 2 | e⁺ decay     | FD | `e+.pt`  | `e+`/`FD` |
+  | 3 | e⁻ decay     | FD | `e-d.pt` | `e-`/`FD` |
+
+- The "hadron-gated" .dat files are gated on *scattered e′ found in the FT*.
+- The FT measures no vertex (vz_rec ≈ −3 cm constant) — Δvz is not used in
+  the resolution sanity cuts.
 
 ## Directory layout
 
 ```
-~/fastmc/scripts_jpsi/                    ← this directory (code, persistent)
-/volatile/clas12/vpk/fastmc/phi/     ← per-run output
-    rga_fall2018_{inb|outb}/v10/
-        hipo/                        symlink to HIPO files
-        dat/                         .dat training data
-        cuts/                        resolution JSON
-        models/                      trained .pt files
-        plots/                       validation PDFs
-        report/                      chain + training logs
+~/fastmc/scripts_jpsi/                 ← this directory (code, persistent)
+/volatile/clas12/vpk/fastmc/jpsi/<dataset>/v1/
+    hipo/hipo_dir                      symlink to GEMC HIPO files
+    dat/                               jpsi_tm_*.dat training data
+    cuts/                              resolution JSON (FD + FT)
+    models/                            e-.pt  p.pt  e+.pt  e-d.pt
+    plots/                             validation + kinematics PDFs
+    report/                            chain + training logs
 ```
 
-## Full chain (4 steps)
+## Datasets (GEMC by M. Tenorio, /volatile/clas12/osg/marianat/)
 
-### Step 1 — HIPO → DAT
+| Dataset | OSG dir | Beam (GeV) |
+|---|---|---|
+| F18in_45nA  | 769   | 10.6 |
+| F18in_50nA  | 770   | 10.6 |
+| F18in_55nA  | 768   | 10.6 |
+| F18out_40nA | 771   | 10.6 |
+| F18out_50nA | 772   | 10.6 |
+| S18in_35nA  | 10797 | 10.6 |
+| S18in_50nA  | 10798 | 10.6 |
+| S18out_45nA | 10799 | 10.6 |
+| S19in_50nA  | 10796 | **10.2** |
 
-Converts GEMC HIPO files to compact .dat text files via TruthMatch
-(MC::RecMatch quality > 0.98). Batched to survive occasional HIPO reader
-crashes.
+## Full chain
 
-```
-Scripts:  run_batches_tm.sh
-          make_training_data_truthmatch.py
-          make_training_data.py  (imported as mtd)
-          matching_cuts.py       (imported by mtd)
-```
-
-Launch:
-```bash
-cd ~/fastmc/scripts_jpsi
-PY=/work/clas12/vpk/fast_MC/venv/bin/python
-
-# Inbending (θ_e ≥ 6°)
-nohup ./run_batches_tm.sh \
-    /path/to/hipo_dir  /path/to/output_dat_dir  5  6.0 \
-    > /tmp/batch_inb.log 2>&1 &
-
-# Outbending (θ_e ≥ 4°)
-nohup ./run_batches_tm.sh \
-    /path/to/hipo_dir  /path/to/output_dat_dir  5  4.0 \
-    > /tmp/batch_outb.log 2>&1 &
-```
-
-Outputs (4 merged .dat files per torus setting):
-- `phi_tm_train.dat` / `phi_tm_val.dat` — all events → electron training
-- `phi_tm_hadgated_train.dat` / `phi_tm_hadgated_val.dat` — electron-in-FD subset → hadron training
-
-### Step 2 — Resolution JSON
-
-Fits polynomial μ(p), σ(p) to residual distributions. Used as a sanity cut
-during MDN training to reject reconstruction pathologies.
-
-```
-Script:  build_matching_cuts.py
-```
-
-### Step 3 — Train 4 MLPs
-
-One MLP per particle (e⁻, p, K⁻, K⁺). Each has an acceptance classifier
-and a 5-component Gaussian mixture smearing network.
-
-- Electron trains on the full file (phi_tm_train.dat), 20σ sanity cut
-- Hadrons train on the gated file (phi_tm_hadgated_train.dat), 10σ sanity cut
-
-```
-Script:  train_single_particle.py
-```
-
-Particle index order in .dat: 0 = e⁻, 1 = p, 2 = K⁻, 3 = K⁺
-
-### Step 4 — Validate
-
-Hierarchical FastMC sampling (electron first, hadrons conditional), compared
-to GEMC truth. Produces a 13-page diagnostic PDF per model type.
-
-```
-Scripts:  validate_event_full.py
-          validate_fast_mc_v2.py  (imported)
-          fast_mc.py              (model architecture, imported)
-          grid_fastmc.py          (grid model, imported)
-          config.py               (paths, imported by fast_mc.py)
-```
-
-Key output: `validation_MLP.pdf` — page 13 has the summary table.
-Target: all-4 ratio = 95–105%.
-
-## Automated chain
-
-`run_v10_chain.sh` runs steps 2–4 starting from existing .dat files:
+### Step 1 — HIPO → DAT (all datasets, parallel)
 
 ```bash
 cd ~/fastmc/scripts_jpsi
-
-# Single torus setting
-nohup ./run_v10_chain.sh inb  > /dev/null 2>&1 &
-nohup ./run_v10_chain.sh outb > /dev/null 2>&1 &
+./run_all_hipo2dat.sh                  # ~40 min for all 9
 ```
 
-What it does:
-1. Builds resolution JSON from val .dat
-2. Trains 4 MLPs in parallel (OMP_NUM_THREADS=4 per process)
-3. Runs validation, produces PDFs
-
-Runtime: ~1 hour per torus setting.
-
-## Monitor
+Single dataset (beam energy is the 4th argument, default 10.6):
 
 ```bash
-./check_v10_both.sh
+./run_batches_tm.sh /volatile/clas12/vpk/fastmc/jpsi/S19in_50nA/v1/hipo/hipo_dir \
+                    /volatile/clas12/vpk/fastmc/jpsi/S19in_50nA/v1/dat  5  10.2
 ```
 
-Shows: chain log, model count (N/4), training progress, smearing std values,
-validation status. Green when both reach 4/4 models + validation PDF.
+Outputs per dataset: `jpsi_tm_{train,val}.dat` (all events → e′ training) and
+`jpsi_tm_hadgated_{train,val}.dat` (e′-in-FT subset → p/e⁺/e⁻d training).
 
-### Healthy std values (approximate)
+### Steps 2–4 — resolution JSON → train 4 MLPs → validate
 
-```
-  e-  dp≈0.05   dth≈0.15  dphi≈0.50  dvz≈0.50
-   p  dp≈0.04   dth≈0.30  dphi≈0.60  dvz≈1.50
-  K-  dp≈0.02   dth≈0.30  dphi≈0.65  dvz≈1.55
-  K+  dp≈0.02   dth≈0.30  dphi≈0.65  dvz≈1.55
+```bash
+./run_v1_chain.sh F18in_45nA           # one dataset (~15–60 min)
+./run_all_chains.sh                    # all 9, three at a time
 ```
 
-If dp_std ≥ 1 GeV → the sanity cut is missing or not working.
+Key output: `plots/validation_MLP.pdf` — page 13 has the summary table.
+Target: ALL-4 joint ratio FastMC/GEMC = 95–105%.
+First result (S18in_35nA): **99.2%**.
+
+## Monitoring
+
+```bash
+tail -f /volatile/clas12/vpk/fastmc/jpsi/*/v1/report/hipo2dat.log   # step 1
+tail -f /volatile/clas12/vpk/fastmc/jpsi/<DS>/v1/report/CHAIN.log   # steps 2–4
+```
+
+## Plots
+
+```bash
+# 4 pages of generated kinematics: Q², xB, W, t, t′=|t−t_min|, M(e+e-);
+# e′(FT), decay leptons, proton — E, θ, θ vs E
+python plot_gen_jpsi.py <dat_file> -o gen.pdf
+
+# 5 pages incl. rec−gen resolutions (TruthMatch .dat format)
+python plot_training_data.py <dat_file> -o plots.pdf
+```
 
 ## Python environment
 
 ```
-/work/clas12/vpk/fast_MC/venv/bin/python
+source /work/clas12/vpk/fast_MC/venv/bin/activate
 ```
 
-Requires: numpy, matplotlib, torch, scikit-learn, scipy, hipopy (step 1 only).
+Restore after a /work purge: `pip install -r requirements.txt`
+(needs numpy, matplotlib, torch, scikit-learn, scipy, hipopy).
 
 ## File dependency graph
 
 ```
-run_batches_tm.sh
-  └── make_training_data_truthmatch.py
-        ├── make_training_data.py (as mtd)
-        └── matching_cuts.py
+run_all_hipo2dat.sh
+  └── run_batches_tm.sh
+        └── make_training_data_truthmatch.py   (pidonly_ft mode)
+              ├── make_training_data.py  (as mtd; EXPECTED_PIDS epe+e- fixed)
+              └── matching_cuts.py
 
-build_matching_cuts.py  (standalone)
-
-train_single_particle.py
-  └── matching_cuts.py
-
-validate_event_full.py
-  ├── validate_fast_mc_v2.py
-  │     └── fast_mc.py → config.py
-  ├── fast_mc.py → config.py
-  └── grid_fastmc.py
+run_all_chains.sh
+  └── run_v1_chain.sh
+        ├── build_matching_cuts.py   (FD + FT, no theta boundary)
+        ├── train_single_particle.py (--model_name e-/p/e+/e-d, FT sanity cut)
+        └── validate_event_full.py   (unique names, M(e+e-)/MM pages)
+              ├── validate_fast_mc_v2.py → fast_mc.py → config.py
+              └── grid_fastmc.py
 ```
 
-## Recovering the Python environment
+## Known limitations (v1)
 
-The venv lives on `/work` which JLab can purge. A frozen package list is
-saved in this directory for recovery.
-
-### Save (do this once, already done)
-
-```bash
-/work/clas12/vpk/fast_MC/venv/bin/pip freeze > ~/fastmc/scripts_jpsi/requirements.txt
-```
-
-### Restore (if /work is wiped)
-
-```bash
-# Use the system python3 to create a fresh venv
-python3 -m venv /work/clas12/vpk/fast_MC/venv
-
-# Install everything from the saved list (includes nvidia/CUDA libs
-# bundled by PyTorch — large but required, CPU-only torch doesn't
-# work on ifarm)
-/work/clas12/vpk/fast_MC/venv/bin/pip install -r ~/fastmc/scripts_jpsi/requirements.txt
-```
-
-If `requirements.txt` is also lost, install manually:
-
-```bash
-/work/clas12/vpk/fast_MC/venv/bin/pip install \
-    numpy matplotlib torch scikit-learn scipy hipopy pypdf
-```
-
-This pulls the latest versions. The training code is not version-sensitive,
-but for exact reproducibility keep `requirements.txt` current.
+- The M(e⁺e⁻) radiative tail below ~2.95 GeV is under-populated by the
+  5-Gaussian MDN (extreme bremsstrahlung tail of the decay leptons).
+- The generator has a small empty gap at Q² ≈ 0.146–0.148 GeV² (harmless:
+  the analysis uses Q² < ~0.12 GeV²).
