@@ -10,7 +10,7 @@ TAG=${1:?Usage: $0 <inb|outb>}
 
 # ── paths ──
 PY=/work/clas12/vpk/fast_MC/venv/bin/python
-CODE=$HOME/fastmc/scripts
+CODE=$HOME/fastmc/scripts_jpsi
 V10=/volatile/clas12/vpk/fastmc/phi/rga_fall2018_${TAG}/v10
 
 TRAIN_ALL=$V10/dat/phi_tm_train.dat

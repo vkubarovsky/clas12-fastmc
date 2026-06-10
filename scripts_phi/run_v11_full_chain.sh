@@ -8,7 +8,7 @@
 #
 # Expects:
 #   /volatile/.../rga_fall2018_{inb|outb}/v11/hipo/  ← symlink to HIPO files
-#   ~/fastmc/scripts/                                ← all python scripts
+#   ~/fastmc/scripts_phi/                                ← all python scripts
 set -euo pipefail
 
 TAG=${1:?Usage: $0 <inb|outb>}
@@ -16,7 +16,7 @@ TAG=${1:?Usage: $0 <inb|outb>}
 
 # ── paths ──
 PY=/work/clas12/vpk/fast_MC/venv/bin/python
-CODE=$HOME/fastmc/scripts
+CODE=$HOME/fastmc/scripts_phi
 V11=/volatile/clas12/vpk/fastmc/phi/rga_fall2018_${TAG}/v11
 
 # ── theta cut: 6° inbending, 4° outbending ──

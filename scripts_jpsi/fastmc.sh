@@ -24,14 +24,14 @@
 
 set -euo pipefail
 
-# ─── Defaults (tweak as needed) ──────────────────────────────────────────
+# --- Defaults (tweak as needed) ------------------------------------------
 ROOT_DEFAULT=/volatile/clas12/vpk/fastmc
 CPP_BIN_DEFAULT=/home/vpk/fastmc/cpp/build/make_training_data
-PY_SCRIPTS_DEFAULT=/home/vpk/fastmc/scripts
+PY_SCRIPTS_DEFAULT=/home/vpk/fastmc/scripts_jpsi
 PY_INTERP_DEFAULT=/work/clas12/vpk/fast_MC/venv/bin/python
 PLACEHOLDER_GRID=/tmp/placeholder_grid.npz
 
-# ─── Parse global args ───────────────────────────────────────────────────
+# --- Parse global args ---------------------------------------------------
 CMD=""
 CHANNEL=""
 PERIOD=""
@@ -92,13 +92,13 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# ─── Validate ────────────────────────────────────────────────────────────
+# --- Validate ------------------------------------------------------------
 [ -n "$CHANNEL"  ] || { echo "Need --channel"  >&2; exit 2; }
 [ -n "$PERIOD"   ] || { echo "Need --period"   >&2; exit 2; }
 [ -n "$POLARITY" ] || { echo "Need --polarity" >&2; exit 2; }
 [ -n "$VERSION"  ] || { echo "Need --version"  >&2; exit 2; }
 
-# ─── Compute paths ───────────────────────────────────────────────────────
+# --- Compute paths -------------------------------------------------------
 OUT="${ROOT}/${CHANNEL}/${PERIOD}_${POLARITY}/${VERSION}"
 DAT_DIR="${OUT}/dat"
 CUTS_DIR="${OUT}/cuts"
@@ -112,7 +112,7 @@ mkdir -p "$DAT_DIR" "$CUTS_DIR" "$MODELS_DIR" "$PLOTS_DIR" "$REPORT_DIR"
 CUTS_JSON="${CUTS_DIR}/matching_cuts.json"
 BASENAME="phi_tm"   # could be parameterized later per channel
 
-# ─── Snapshot the call into params.json (best effort) ─────────────────────
+# --- Snapshot the call into params.json (best effort) ---------------------
 write_params() {
     cat > "$PARAMS_FILE" <<EOF
 {
@@ -137,7 +137,7 @@ write_params() {
 EOF
 }
 
-# ─── Step implementations ────────────────────────────────────────────────
+# --- Step implementations ------------------------------------------------
 do_build_dat() {
     [ -n "$HIPO_DIR" ] || { echo "Need --hipo-dir for build-dat" >&2; exit 2; }
     [ -x "$CPP_BIN" ]  || { echo "C++ binary not found / not executable: $CPP_BIN" >&2; exit 2; }
@@ -223,7 +223,7 @@ do_all() {
     do_validate
 }
 
-# ─── Dispatch ────────────────────────────────────────────────────────────
+# --- Dispatch ------------------------------------------------------------
 case "$CMD" in
     clean)       do_clean ;;
     build-dat)   do_build_dat ;;

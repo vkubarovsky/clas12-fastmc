@@ -6,7 +6,7 @@ Per-particle MLP acceptance + MDN resolution, trained on GEMC TruthMatch data.
 ## Directory layout
 
 ```
-~/fastmc/scripts/                    ← this directory (code, persistent)
+~/fastmc/scripts_jpsi/                    ← this directory (code, persistent)
 /volatile/clas12/vpk/fastmc/phi/     ← per-run output
     rga_fall2018_{inb|outb}/v10/
         hipo/                        symlink to HIPO files
@@ -34,7 +34,7 @@ Scripts:  run_batches_tm.sh
 
 Launch:
 ```bash
-cd ~/fastmc/scripts
+cd ~/fastmc/scripts_jpsi
 PY=/work/clas12/vpk/fast_MC/venv/bin/python
 
 # Inbending (θ_e ≥ 6°)
@@ -96,7 +96,7 @@ Target: all-4 ratio = 95–105%.
 `run_v10_chain.sh` runs steps 2–4 starting from existing .dat files:
 
 ```bash
-cd ~/fastmc/scripts
+cd ~/fastmc/scripts_jpsi
 
 # Single torus setting
 nohup ./run_v10_chain.sh inb  > /dev/null 2>&1 &
@@ -166,7 +166,7 @@ saved in this directory for recovery.
 ### Save (do this once, already done)
 
 ```bash
-/work/clas12/vpk/fast_MC/venv/bin/pip freeze > ~/fastmc/scripts/requirements.txt
+/work/clas12/vpk/fast_MC/venv/bin/pip freeze > ~/fastmc/scripts_jpsi/requirements.txt
 ```
 
 ### Restore (if /work is wiped)
@@ -178,7 +178,7 @@ python3 -m venv /work/clas12/vpk/fast_MC/venv
 # Install everything from the saved list (includes nvidia/CUDA libs
 # bundled by PyTorch — large but required, CPU-only torch doesn't
 # work on ifarm)
-/work/clas12/vpk/fast_MC/venv/bin/pip install -r ~/fastmc/scripts/requirements.txt
+/work/clas12/vpk/fast_MC/venv/bin/pip install -r ~/fastmc/scripts_jpsi/requirements.txt
 ```
 
 If `requirements.txt` is also lost, install manually:
